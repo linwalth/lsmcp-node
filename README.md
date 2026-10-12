@@ -8,13 +8,7 @@ Node MCP server for Logseq.
 
 ## What This Is
 
-`lsmcp-node` exposes Logseq read/write tools over MCP so MCP clients can automate page and block workflows. It is the Node/TypeScript sibling of [lsmcp](https://github.com/linwalth/lsmcp) — same tool surface, same conventions, no Python required.
-
-It talks to Logseq's local HTTP API, deduplicates blocks by UUID at read time, and returns lean responses by default.
-
-## Why lsmcp-node
-
-Same 34-tool surface as `lsmcp`, but implemented in TypeScript and runnable with plain `node` — no `uv`, no virtualenv. Useful when you want a zero-Python install or an `npx`-style launch.
+`lsmcp-node` exposes Logseq read/write tools over MCP so clients like Claude Desktop can automate page and block workflows. It is the Node/TypeScript sibling of [lsmcp](https://github.com/linwalth/lsmcp) — same 34-tool surface and conventions, but runnable with plain `node` (no `uv`, no virtualenv). It talks to Logseq's local HTTP API, deduplicates blocks by UUID at read time, and returns lean responses by default.
 
 ## Tools
 
@@ -57,29 +51,24 @@ Same 34-tool surface as `lsmcp`, but implemented in TypeScript and runnable with
 
 ## Requirements
 
-Complete this checklist before install:
-
 - [ ] Node.js 18+ is installed: `node --version`
-- [ ] Logseq Desktop is running with API enabled:
+- [ ] Logseq Desktop is running with the API enabled:
   `Settings -> Features -> Enable developer mode -> Enable API server`
 - [ ] `LOGSEQ_API_TOKEN` is available from Logseq:
   `Settings -> Features -> API server -> API token`
 
 ## Install
 
-Clone the repo, then build from the repo root:
-
 ```bash
 set -euo pipefail
 cd /path/to/lsmcp-node
-node --version
 npm install
 npm run build
 ```
 
 ## Token
 
-`lsmcp-node` reads the Logseq API token from `LOGSEQ_API_TOKEN`. You can cache it once instead of exporting it every time:
+`lsmcp-node` reads the token from `LOGSEQ_API_TOKEN`. Cache it once instead of exporting every time:
 
 ```bash
 node dist/cli.js --login    # prompts, writes ~/.config/lsmcp/token (0600)
@@ -94,11 +83,7 @@ Resolution order: `LOGSEQ_API_TOKEN` env → cached token file.
 LOGSEQ_API_TOKEN=<token> node dist/cli.js
 ```
 
-Expected first-run result:
-
-- Process starts without a stack trace.
-- The server logs `lsmcp-node listening on http://127.0.0.1:8765/mcp`.
-- `health` requests return `{"status":"ok",...}` from your MCP client.
+First run logs `lsmcp-node listening on http://127.0.0.1:8765/mcp` and answers `health` with `{"status":"ok",...}`.
 
 ## Transports
 
@@ -132,7 +117,7 @@ HTTP binds to loopback by default. If you expose it on `0.0.0.0`, put it behind 
 
 ## MCP Client Config
 
-Primary example for Claude Desktop (stdio transport):
+Claude Desktop example (stdio transport):
 
 ```json
 {
@@ -150,9 +135,7 @@ Primary example for Claude Desktop (stdio transport):
 }
 ```
 
-Replace `/path/to/lsmcp-node` with the absolute path to your cloned repo.
-
-For HTTP clients (Cursor, VS Code MCP, custom launchers), start the server with the default transport and point the client at `http://127.0.0.1:8765/mcp`.
+Replace `/path/to/lsmcp-node` with the absolute path to your cloned repo. HTTP clients (Cursor, VS Code MCP) point at `http://127.0.0.1:8765/mcp` instead.
 
 ## Smoke Check
 
