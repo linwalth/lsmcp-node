@@ -31,8 +31,8 @@ Node MCP server for Logseq.
 | `search_blocks` | Full-text search over BLOCK CONTENTS (find lore by substance, not just page names) |
 | `list_blueprints` | List page-structure templates under the `blaupausen/` namespace |
 | `get_blueprint` | Fetch the headed-block layout of a blueprint so new pages match graph conventions |
-| `get_conventions` | Structured JSON of all writing conventions (typography, structure, links, statblock schema) |
-| `get_namespace_map` | Namespace architecture map (static purpose + live page counts) |
+| `get_conventions` | Structured JSON of writing conventions; graph-aware (worldbuilding graph only, otherwise a generic note) |
+| `get_namespace_map` | Namespace architecture map (static purpose + live page counts, existing namespaces only) |
 | `validate_page` | Lint a page against conventions: dead links, em-dashes, CJK, bullet prefixes, title redundancy |
 | `orphan_report` | Report pages with zero backlinks, classified by orphan policy |
 | `similar_pages` | Find near-duplicate page names via fuzzy string matching |
@@ -64,6 +64,14 @@ set -euo pipefail
 cd /path/to/lsmcp-node
 npm install
 npm run build
+```
+
+### Development
+
+```bash
+npm run typecheck   # tsc --noEmit
+npm run build       # bundle src -> dist/cli.js (esbuild)
+npm run build:app   # full macOS app: server bundle + bun binary + swift + codesign
 ```
 
 ## Token
@@ -160,6 +168,17 @@ Additional environment variables:
 | `LOGSEQ_API_TIMEOUT` | `30` | API request timeout in seconds |
 
 HTTP binds to loopback by default. If you expose it on `0.0.0.0`, put it behind an authenticated reverse proxy — the server does not enforce its own bearer token.
+
+### Argument handling
+
+Tool arguments are coerced and validated before a handler runs:
+
+- structured fields (`blocks`, `properties`, `query.inputs`) may be sent as a JSON string (some MCP clients stringify them) and are unwrapped back into arrays/objects;
+- numeric/boolean scalars sent as strings (`"50"`, `"true"`) are converted;
+- arguments that do not match the tool schema are rejected with a clear `invalid arguments: ...` error instead of failing deep inside a handler.
+
+`block_update`, `page_create`, and `rename_page` surface a `warning` field when a readback diverges from the request instead of failing silently. Only idempotent (read) Logseq API calls are retried on 5xx/transport errors; writes are never replayed.
+
 
 ## MCP Client Config
 

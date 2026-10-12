@@ -278,7 +278,7 @@ export const writeTools: ToolReg[] = [
     inputSchema: {
       name: z.string().describe("New page name with natural casing (e.g. 'Meeting Notes 2026'). Do NOT lowercase — casing becomes the display name."),
       properties: z.record(z.any()).optional().nullable().describe("Optional page-level properties as a key/value object. Omit or null for none."),
-      blocks: z.any().optional().nullable().describe("Optional initial blocks. Same format as block_append: strings or objects {content, properties?, children?}."),
+      blocks: z.blocks().optional().nullable().describe("Optional initial blocks. Same format as block_append: strings or objects {content, properties?, children?}."),
     },
     annotations: ANNOT_APPEND,
     handler: async (client, { name, properties, blocks }) => {
@@ -293,10 +293,12 @@ export const writeTools: ToolReg[] = [
       const created = await client.call("logseq.Editor.createPage", pageName, pageProperties, { createFirstBlock: false });
       if (!created) throw new Error(`failed to create page: ${pageName}`);
 
+      let warning: string | undefined;
       if (pageName !== pageName.toLowerCase()) {
         try {
           await client.call("logseq.Editor.renamePage", pageName, pageName);
         } catch {
+          warning = `display-name rename failed; page is stored under the lowercased name '${pageName.toLowerCase()}'`;
           console.error(`[lsmcp-node] post-create rename (display-name fix) failed for ${pageName}`);
         }
       }
@@ -307,13 +309,15 @@ export const writeTools: ToolReg[] = [
       const pageView = dumpPage(page);
       pageView.name = displayName(page);
 
-      return JSON.stringify({
+      const payload: Record<string, unknown> = {
         page: pageView,
         created: true,
         blocks: blockTree.map(dumpBlock),
         block_count: countBlocks(blockTree),
         appended: appendedCount,
-      });
+      };
+      if (warning) payload.warning = warning;
+      return JSON.stringify(payload);
     },
   },
 
@@ -323,7 +327,7 @@ export const writeTools: ToolReg[] = [
       "Append blocks to an existing page. REQUIRES `page` — never inferred. For journal/day pages use journal_append. CONVENTIONS: call get_conventions before appending narrative content.",
     inputSchema: {
       page: z.string().describe("Existing target page name with natural casing (e.g. 'Meeting Notes'). NOT a journal date — use journal_append for that."),
-      blocks: z.any().describe("Block(s) to insert. Accepts a string, an object {content, properties?, children?}, or a list mixing both."),
+      blocks: z.blocks().describe("Block(s) to insert. Accepts a string, an object {content, properties?, children?}, or a list mixing both."),
     },
     annotations: ANNOT_APPEND,
     handler: async (client, { page, blocks }) => {
@@ -346,7 +350,7 @@ export const writeTools: ToolReg[] = [
       "Prepend blocks to the TOP of an existing page (above all existing content). Same block formats as block_append. Blocks appear at the top in the order supplied.",
     inputSchema: {
       page: z.string().describe("Existing target page name with natural casing. NOT a journal date."),
-      blocks: z.any().describe("Block(s) to insert. Accepts a string, an object {content, properties?, children?}, or a list mixing both."),
+      blocks: z.blocks().describe("Block(s) to insert. Accepts a string, an object {content, properties?, children?}, or a list mixing both."),
     },
     annotations: ANNOT_APPEND,
     handler: async (client, { page, blocks }) => {
@@ -375,10 +379,12 @@ export const writeTools: ToolReg[] = [
     handler: async (client, { uuid, content }) => {
       await client.call("logseq.Editor.updateBlock", uuid, content);
       const block = await getBlockOrError(client, uuid as string);
+      const out: Record<string, unknown> = { uuid: block.uuid, content: block.content };
       if (block.content !== content) {
+        out.warning = "readback content differs from requested content (Logseq normalized the markdown); verify with get_block";
         console.error(`[lsmcp-node] block_update readback mismatch for ${uuid}`);
       }
-      return JSON.stringify({ uuid: block.uuid, content: block.content });
+      return JSON.stringify(out);
     },
   },
 
@@ -434,10 +440,12 @@ export const writeTools: ToolReg[] = [
       await client.call("logseq.Editor.renamePage", on, nn);
 
       const page = await getPageOrError(client, nn);
+      const out: Record<string, unknown> = { ok: true, old_name: on, new_name: nn };
       if (page.name?.toLowerCase() !== nn.toLowerCase() && displayName(page) !== nn) {
+        out.warning = `readback name differs from requested '${nn}' (stored as '${page.name ?? displayName(page)}')`;
         console.error(`[lsmcp-node] rename_page readback name mismatch: expected ${nn}`);
       }
-      return JSON.stringify({ ok: true, old_name: on, new_name: nn });
+      return JSON.stringify(out);
     },
   },
 
@@ -500,7 +508,7 @@ export const writeTools: ToolReg[] = [
       "Append blocks to a journal page for a given DATE, creating it if needed. `date` selects WHICH day's journal (ISO yyyy-MM-dd), unlike block_append which targets a named page. Accepts the same block formats as block_append.",
     inputSchema: {
       date: z.string().describe("ISO calendar date as yyyy-MM-dd (e.g. '2026-09-22')."),
-      blocks: z.any().describe("Block(s) to insert. Accepts a string, an object {content, properties?, children?}, or a list mixing both."),
+      blocks: z.blocks().describe("Block(s) to insert. Accepts a string, an object {content, properties?, children?}, or a list mixing both."),
     },
     annotations: ANNOT_APPEND,
     handler: async (client, { date, blocks }) => {

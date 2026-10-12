@@ -105,8 +105,11 @@ export class LogseqClient {
       let backoff = 100;
       let lastErr: unknown = null;
       let sawTransportFailure = false;
+      // Only retry idempotent (read) calls. Replaying a write after a 5xx or a
+      // timeout could duplicate blocks (createPage/appendBlockInPage/...).
+      const maxAttempts = isWriteMethod(method) ? 1 : 4;
 
-      for (let attempt = 0; attempt < 4; attempt++) {
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
         if (attempt > 0) {
           await sleep(backoff);
           backoff *= 2;

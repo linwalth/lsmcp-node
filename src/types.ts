@@ -60,10 +60,18 @@ export function coerceBlock(raw: any): BlockEntity {
   if (!raw || typeof raw !== "object") return {};
   const b: BlockEntity = { ...raw };
   if (Array.isArray(b.children)) {
-    // Compact children format [["uuid", value]] is dropped entirely (mirrors
-    // the upstream Pydantic validator).
+    // Compact children format [["uuid", value]] — preserve it instead of
+    // dropping it silently: map each pair to a minimal block so the data
+    // survives into the dump (content kept when it is a string).
     if (b.children.length && Array.isArray(b.children[0])) {
-      b.children = [];
+      b.children = (b.children as unknown as unknown[][])
+        .filter((pair) => Array.isArray(pair))
+        .map((pair) => {
+          const uuid = typeof pair[0] === "string" ? pair[0] : undefined;
+          const value = pair[1];
+          const content = typeof value === "string" ? value : value && typeof value === "object" ? "" : String(value ?? "");
+          return coerceBlock({ uuid, content });
+        });
     } else {
       b.children = b.children.filter((c: any) => c && typeof c === "object").map(coerceBlock);
     }

@@ -1,10 +1,11 @@
 import http from "node:http";
 import readline from "node:readline";
+import { randomUUID } from "node:crypto";
 import { SERVER_INFO, processMessage } from "./mcp";
 import type { JsonRpcMsg, JsonRpcResp } from "./mcp";
 import type { LogseqClient } from "./client";
 
-const MAX_BODY = 1_000_000;
+const MAX_BODY = 10_000_000;
 
 export function startHttpServer(host: string, port: number, client: LogseqClient): http.Server {
   const server = http.createServer(async (req, res) => {
@@ -73,7 +74,18 @@ export function startHttpServer(host: string, port: number, client: LogseqClient
         return;
       }
       const out = responses.length === 1 && msgs.length === 1 ? responses[0] : responses;
-      res.writeHead(200, { "Content-Type": "application/json" });
+      // Streamable HTTP clients may expect a session id header. We are stateless,
+      // so echo the incoming one (if any) and mint one on initialize.
+      const incomingSid = req.headers["mcp-session-id"];
+      const sid =
+        typeof incomingSid === "string" && incomingSid
+          ? incomingSid
+          : msgs.some((m) => m.method === "initialize")
+            ? randomUUID()
+            : undefined;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (sid) headers["Mcp-Session-Id"] = sid;
+      res.writeHead(200, headers);
       res.end(JSON.stringify(out));
     });
   });

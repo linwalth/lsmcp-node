@@ -1,6 +1,7 @@
 import { toJsonSchema } from "./schema";
 import type { LogseqClient } from "./client";
 import type { ToolReg } from "./tools/shared";
+import { coerceArgs, validateArgs } from "./tools/shared";
 import { coreTools } from "./tools/core";
 import { navTools } from "./tools/nav";
 import { writeTools } from "./tools/write";
@@ -65,11 +66,19 @@ function handleSync(msg: JsonRpcMsg): JsonRpcResp | null {
 async function handleCall(msg: JsonRpcMsg, client: LogseqClient): Promise<JsonRpcResp> {
   const id = msg.id ?? null;
   const toolName = msg.params?.name as string;
-  const args = (msg.params?.arguments || {}) as Record<string, unknown>;
+  const rawArgs = (msg.params?.arguments || {}) as Record<string, unknown>;
   const tool = ALL_TOOLS.find((t) => t.name === toolName);
 
   if (!tool) {
     return { jsonrpc: "2.0", id, result: { content: [{ type: "text", text: `Unknown tool: ${toolName}` }], isError: true } };
+  }
+
+  let args: Record<string, unknown>;
+  try {
+    args = coerceArgs(tool.inputSchema, rawArgs);
+    validateArgs(tool.inputSchema, args);
+  } catch (err) {
+    return { jsonrpc: "2.0", id, result: { content: [{ type: "text", text: `Error: ${(err as Error).message}` }], isError: true } };
   }
 
   try {

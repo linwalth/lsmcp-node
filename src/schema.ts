@@ -28,6 +28,21 @@ function wrap(s: JsonSchema): Schema {
   return new Schema(s);
 }
 
+const BLOCK_NODE_SCHEMA: JsonSchema = {
+  oneOf: [
+    { type: "string" },
+    {
+      type: "object",
+      properties: {
+        content: { type: "string" },
+        properties: { type: "object" },
+        children: { type: "array" },
+      },
+      required: ["content"],
+    },
+  ],
+};
+
 export const z = {
   string: (): Schema => wrap({ type: "string" }),
   number: (): Schema => wrap({ type: "number" }),
@@ -36,6 +51,11 @@ export const z = {
   array: (item?: Schema): Schema => wrap({ type: "array", items: item ? item.schema : {} }),
   record: (value?: Schema): Schema => wrap({ type: "object", additionalProperties: value ? value.schema : true }),
   object: (shape: Record<string, Schema>): Schema => wrap(objectSchema(shape)),
+  // Block payload accepted by block_append/block_prepend/page_create/journal_append:
+  // a single string, a {content, properties?, children?} object, or a list mixing both.
+  // Declaring a real shape (not z.any()) keeps well-behaved clients from
+  // stringifying the value and lets the server coerce/validate it.
+  blocks: (): Schema => wrap({ oneOf: [BLOCK_NODE_SCHEMA, { type: "array", items: BLOCK_NODE_SCHEMA }] }),
 };
 
 export function objectSchema(shape: Record<string, Schema>): JsonSchema {

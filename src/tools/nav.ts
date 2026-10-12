@@ -197,6 +197,19 @@ function sequenceRatio(a: string, b: string): number {
   return (2 * ratcliffMatches(a, b)) / total;
 }
 
+// The static CONVENTIONS/NAMESPACE_MAP below describe the worldbuilding graph.
+// Detect that graph from its namespaces so other graphs (e.g. the nsc distillery)
+// get a generic answer instead of irrelevant worldbuilding rules.
+const WORLDBUILDING_MARKERS = ["blaupausen/", "schauplätze", "kreaturen", "götter und höhere wesen"];
+
+async function isWorldbuildingGraph(client: LogseqClient): Promise<boolean> {
+  for (const page of await client.getAllPages()) {
+    const name = (page.name || "").toLowerCase();
+    if (WORLDBUILDING_MARKERS.some((marker) => name.startsWith(marker))) return true;
+  }
+  return false;
+}
+
 export const navTools: ToolReg[] = [
   {
     name: "query",
@@ -506,7 +519,15 @@ export const navTools: ToolReg[] = [
       "Return the graph's WRITING CONVENTIONS as structured JSON: typography, structure, links, game-design rules, and statblock schema. Call this BEFORE writing any narrative content.",
     inputSchema: {},
     annotations: ANNOT_READ_ONLY,
-    handler: async () => JSON.stringify(CONVENTIONS),
+    handler: async (client) => {
+      if (!(await isWorldbuildingGraph(client))) {
+        return JSON.stringify({
+          profile: "generic",
+          note: "No graph-specific writing conventions configured for this graph. Generic checks (dead links, em/en dashes, smart quotes, CJK, bullet prefixes, indented headings) still apply via validate_page.",
+        });
+      }
+      return JSON.stringify({ profile: "worldbuilding", ...CONVENTIONS });
+    },
   },
 
   {
@@ -531,7 +552,7 @@ export const navTools: ToolReg[] = [
         }
       }
 
-      const allNamespaces = new Set<string>([...topCounts.keys(), ...Object.keys(NAMESPACE_MAP)]);
+      const allNamespaces = new Set<string>([...topCounts.keys()]);
       const result: Record<string, Record<string, unknown>> = {};
       for (const ns of [...allNamespaces].sort()) {
         const purpose = NAMESPACE_MAP[ns];
@@ -713,7 +734,10 @@ export const navTools: ToolReg[] = [
         if (page.name && !isJournal(page)) names.push(displayName(page) || page.name);
       }
 
-      const namesSorted = names.sort((a, b) => cmp(a.toLowerCase(), b.toLowerCase()));
+      // O(n^2) fuzzy comparison: cap the scan so a large graph cannot hang the call.
+      const MAX_SCAN = 1500;
+      const namesSorted = names.sort((a, b) => cmp(a.toLowerCase(), b.toLowerCase())).slice(0, MAX_SCAN);
+      const truncated = names.length > MAX_SCAN;
       const pairs: Array<{ a: string; b: string; similarity: number }> = [];
       const n = namesSorted.length;
       for (let i = 0; i < n; i++) {
@@ -728,7 +752,7 @@ export const navTools: ToolReg[] = [
 
       pairs.sort((a, b) => b.similarity - a.similarity);
       const out = lim > 0 ? pairs.slice(0, lim) : pairs;
-      return JSON.stringify({ pairs: out, count: out.length });
+      return JSON.stringify({ pairs: out, count: out.length, scanned: namesSorted.length, truncated });
     },
   },
 ];
