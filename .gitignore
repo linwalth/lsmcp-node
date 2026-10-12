@@ -1,4 +1,8 @@
 node_modules/
 dist/
+build/
+dist-app/
+macos/.build/
+*.bun-build
 *.log
 .env

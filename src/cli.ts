@@ -8,7 +8,7 @@ const TRANSPORTS = ["stdio", "sse", "streamable-http"];
 
 function tokenCachePath(): string {
   const base = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
-  return path.join(base, "lsmcp", "token");
+  return path.join(base, "lsmcp-node", "token");
 }
 
 function cacheToken(token: string): string {
@@ -62,7 +62,7 @@ function usage(prog: string): string {
 Node MCP server for Logseq.
 
 options:
-  --login               Prompt for the Logseq API token, cache it to ~/.config/lsmcp/token (0600), then exit.
+  --login               Prompt for the Logseq API token, cache it to ~/.config/lsmcp-node/token (0600), then exit.
   --logout              Forget the cached Logseq API token, then exit.
   --transport <t>       MCP transport: stdio | http | streamable-http | sse (default: http, or MCP_TRANSPORT)
   --host <host>         Bind host for http transports (default: 127.0.0.1, or MCP_HOST)
@@ -190,6 +190,11 @@ async function main(): Promise<void> {
     process.stderr.write(`server error: ${err.message}\n`);
     process.exit(1);
   });
+  if (process.env.LSMCP_PARENT_WATCH) {
+    process.stdin.resume();
+    process.stdin.on("end", () => process.exit(0));
+    process.stdin.on("error", () => process.exit(0));
+  }
   process.stderr.write(`lsmcp-node listening on http://${args.host}:${args.port}/mcp\n`);
 }
 

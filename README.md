@@ -71,7 +71,7 @@ npm run build
 `lsmcp-node` reads the token from `LOGSEQ_API_TOKEN`. Cache it once instead of exporting every time:
 
 ```bash
-node dist/cli.js --login    # prompts, writes ~/.config/lsmcp/token (0600)
+node dist/cli.js --login    # prompts, writes ~/.config/lsmcp-node/token (0600)
 node dist/cli.js --logout   # forget the cached token
 ```
 
@@ -84,6 +84,52 @@ LOGSEQ_API_TOKEN=<token> node dist/cli.js
 ```
 
 First run logs `lsmcp-node listening on http://127.0.0.1:8765/mcp` and answers `health` with `{"status":"ok",...}`.
+
+## macOS App
+
+A native menubar app can configure and supervise the server for you (no terminal, no `node` needed at runtime). It stores the Logseq API token at `~/.config/lsmcp-node/token` and settings (api url, host, port) at `~/.config/lsmcp-node/config.json` — the same token path the CLI `--login` uses. From the menubar you can start/stop/restart the server, open settings, and toggle launch at login. The server runs on `http://127.0.0.1:8765/mcp` like the CLI.
+
+### Build
+
+Requirements:
+
+- macOS 13+ (Ventura) for `SMAppService` (launch at login)
+- Node.js 18+ with this repo's deps installed (`npm install`)
+- [Bun](https://bun.sh) — used only at build time, to compile the embedded server binary
+- Xcode Command Line Tools (`xcode-select --install`), providing `swift` and `codesign`
+
+```bash
+npm install
+npm run build:app      # -> dist-app/LSMCP-node.app
+```
+
+`npm run build:app` runs [`scripts/build-app.sh`](./scripts/build-app.sh), which:
+
+1. bundles the TypeScript server to `dist/cli.js` (esbuild)
+2. compiles it to a standalone binary `build/lsmcp-node` (`bun build --compile`, bundles the Bun runtime)
+3. builds the Swift menubar app (`swift build -c release`)
+4. assembles `LSMCP-node.app` and ad-hoc codesigns it (with JIT entitlements for the embedded Bun binary)
+
+### Run
+
+```bash
+open dist-app/LSMCP-node.app
+```
+
+First launch from a build may be quarantined; clear it once:
+
+```bash
+xattr -dr com.apple.quarantine dist-app/LSMCP-node.app
+```
+
+The bundle is ad-hoc signed and intended for local use. To hand it to machines
+you do not control, sign it with an Apple Developer ID and notarize it, otherwise
+Gatekeeper will refuse to launch it there.
+
+Note: with Command Line Tools only (no full Xcode) and Swift 6.4, a plain
+`swift build` fails with `Unknown error parsing property list`; the script passes
+`--build-system native` to work around
+[swiftlang/swift-package-manager#10561](https://github.com/swiftlang/swift-package-manager/issues/10561).
 
 ## Transports
 
