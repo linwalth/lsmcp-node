@@ -1,0 +1,36 @@
+{
+  "name": "lsmcp-node",
+  "version": "0.1.0",
+  "description": "Node MCP server for Logseq.",
+  "main": "dist/cli.js",
+  "bin": {
+    "lsmcp-node": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "dev": "node esbuild.config.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/cli.js"
+  },
+  "keywords": [
+    "logseq",
+    "mcp",
+    "model-context-protocol"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.28.0",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {},
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}
