@@ -1,6 +1,29 @@
 import type { Schema } from "../schema";
 import type { LogseqClient } from "../client";
 
+// Some MCP clients stringify structured arguments (arrays/objects) before sending.
+// A `blocks`/`properties`/`inputs` value may therefore arrive as a JSON string
+// instead of a real array/object. Unwrap such strings back into structured values.
+// Only strings that look like JSON (`[`/`{`) are parsed; plain text is returned as-is.
+export function coerceJsonValue(value: unknown): unknown {
+  let current = value;
+  for (let i = 0; i < 4; i++) {
+    if (typeof current !== "string") return current;
+    const trimmed = current.trim();
+    if (!trimmed) return current;
+    const first = trimmed[0];
+    if (first !== "[" && first !== "{") return current;
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed === current) return current;
+      current = parsed;
+    } catch {
+      return current;
+    }
+  }
+  return current;
+}
+
 export interface ToolReg {
   name: string;
   description: string;

@@ -1,5 +1,5 @@
 import { z } from "../schema";
-import { ANNOT_READ_ONLY } from "./shared";
+import { ANNOT_READ_ONLY, coerceJsonValue } from "./shared";
 import type { ToolReg } from "./shared";
 import type { LogseqClient } from "../client";
 import type { BlockEntity, PageEntity } from "../types";
@@ -210,7 +210,8 @@ export const navTools: ToolReg[] = [
     handler: async (client, { datalog, inputs }) => {
       const stripped = ((datalog as string) || "").trim();
       if (!stripped) throw new Error("datalog query must be a non-empty string");
-      const argsList = Array.isArray(inputs) ? (inputs as unknown[]) : [];
+      const coercedInputs = coerceJsonValue(inputs);
+      const argsList = Array.isArray(coercedInputs) ? (coercedInputs as unknown[]) : [];
       const finalQuery = argsList.length ? interpolate(stripped, argsList) : stripped;
       try {
         const result = await client.call("logseq.DB.customQuery", finalQuery);

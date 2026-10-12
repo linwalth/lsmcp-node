@@ -1,5 +1,5 @@
 import { z } from "../schema";
-import { ANNOT_APPEND, ANNOT_DELETE, ANNOT_READ_ONLY, ANNOT_RENAME, ANNOT_UPDATE_IDEMPOTENT } from "./shared";
+import { ANNOT_APPEND, ANNOT_DELETE, ANNOT_READ_ONLY, ANNOT_RENAME, ANNOT_UPDATE_IDEMPOTENT, coerceJsonValue } from "./shared";
 import type { ToolReg } from "./shared";
 import type { LogseqClient } from "../client";
 import type { BlockEntity, PageEntity } from "../types";
@@ -11,8 +11,25 @@ interface WriteBlock {
   children?: WriteBlock[];
 }
 
-function normalizeBlocks(blocks: unknown): WriteBlock[] {
-  if (blocks === null || blocks === undefined) return [];
+function isBlockNode(value: unknown): boolean {
+  if (typeof value === "string") return true;
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return typeof (value as Record<string, unknown>).content === "string";
+  }
+  return false;
+}
+
+function looksLikeBlocks(value: unknown): boolean {
+  if (Array.isArray(value)) return value.every(isBlockNode);
+  if (value && typeof value === "object") return typeof (value as Record<string, unknown>).content === "string";
+  return false;
+}
+
+function normalizeBlocks(input: unknown): WriteBlock[] {
+  if (input === null || input === undefined) return [];
+  // Unwrap a JSON-stringified block payload (e.g. '[{"content":"x"}]') sent by some clients.
+  const unwrapped = coerceJsonValue(input);
+  const blocks = looksLikeBlocks(unwrapped) ? unwrapped : input;
   const arr = Array.isArray(blocks) ? blocks : [blocks];
   const normalized: WriteBlock[] = [];
   for (const node of arr) {
@@ -266,7 +283,11 @@ export const writeTools: ToolReg[] = [
     annotations: ANNOT_APPEND,
     handler: async (client, { name, properties, blocks }) => {
       const normalizedBlocks = normalizeBlocks(blocks);
-      const pageProperties = (properties as Record<string, unknown>) || {};
+      const coercedProps = coerceJsonValue(properties);
+      const pageProperties =
+        coercedProps && typeof coercedProps === "object" && !Array.isArray(coercedProps)
+          ? (coercedProps as Record<string, unknown>)
+          : {};
       const pageName = name as string;
 
       const created = await client.call("logseq.Editor.createPage", pageName, pageProperties, { createFirstBlock: false });
