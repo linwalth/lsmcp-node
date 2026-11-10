@@ -6,3 +6,4 @@ macos/.build/
 *.bun-build
 *.log
 .env
+.DS_Store
